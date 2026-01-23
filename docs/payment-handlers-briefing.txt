@@ -1,0 +1,76 @@
+CONTEXT BRIEFING: ACP Payment Handlers Design
+
+I need help designing a payment handler framework for ACP (Agentic Commerce Protocol) based on UCP (Universal Checkout Protocol) patterns.
+
+BACKGROUND:
+- UCP has a mature payment handler system with handlers like Google Pay, Shop Pay, and Stripe SPT
+- ACP already has capability negotiation (rfc.capability_negotiation.md) and delegate payment (rfc.delegate_payment.md)
+- We need to adapt UCP's handler pattern to ACP's architecture
+
+UCP HANDLER PATTERN:
+Handlers are advertised by merchants in a payment.handlers[] array with this structure:
+{
+  "id": "unique_id",
+  "name": "reverse.dns.format",           // e.g., com.google.pay
+  "version": "2026-01-11",
+  "spec": "https://...",
+  "config_schema": "https://...",
+  "instrument_schemas": ["https://..."],
+  "config": { /* handler-specific config */ }
+}
+
+Each handler defines 3 schemas:
+1. Config Schema - What merchants advertise (merchant_id, network_id, etc.)
+2. Credential Schema - Token/payment data structure
+3. Instrument Schema - Complete payment instrument with display fields + credential
+
+THREE INTEGRATION MODELS:
+1. Delegated Token (Stripe SPT, Shop Pay) - Agent gets token from provider, merchant processes
+2. Headless (Google Pay) - Merchant provides config, agent handles UI/API
+3. Tokenization - One party stores credentials and issues tokens
+
+HANDLER EXAMPLES ANALYZED:
+- Stripe SPT: Agent obtains SPT from Stripe using merchant's stripe_network_id
+- Shop Pay: Agent orchestrates Shop Pay UI with shop_id, gets shop_token
+- Google Pay: Merchant provides full Google Pay config, agent handles JS API
+
+SECURITY PATTERNS:
+- Single-use tokens
+- Time-limited validity
+- Checkout binding (prevents replay)
+- Environment isolation (TEST/PRODUCTION)
+- Participant registration required
+
+ACP CONTEXT:
+Repository: /Users/prasadw/code/agentic-commerce-protocol
+Key RFCs:
+- rfc.capability_negotiation.md - Bidirectional capabilities (agent_capabilities ↔ seller_capabilities)
+- rfc.delegate_payment.md - Current payment delegation
+- rfc.agentic_checkout.md - Checkout flow
+
+ACP uses Seller/Agent terminology (vs UCP's Business/Platform)
+
+KEY DESIGN QUESTIONS:
+1. Where should handlers be advertised in ACP's CheckoutSession?
+2. Are handlers a type of capability or separate from capability negotiation?
+3. How do handlers integrate with existing seller_capabilities.payment_methods?
+4. What's the handler discovery flow?
+5. How do handler-based payments get submitted in ACP?
+6. How do existing payment flows coexist with handlers?
+
+DETAILED CONTEXT FILES:
+- payment-handlers-context-full.md - Complete schemas, examples, all three handlers
+- payment-handlers-context-brief.md - Structured summary
+- UCP files in /Users/prasadw/code/ucp/ for reference
+
+GOAL:
+Design ACP's payment handler framework including:
+1. Handler declaration structure
+2. Base schemas (handler, instrument, credential)
+3. Integration with capability negotiation
+4. Discovery and submission flows
+5. RFC document
+6. Example handler specification
+
+START BY:
+Reading rfc.delegate_payment.md to understand current ACP payment architecture, then design where/how handlers fit.
