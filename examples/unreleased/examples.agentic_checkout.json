@@ -1,8 +1,11 @@
 {
   "create_checkout_session_request": {
-    "items": [
+    "currency": "usd",
+    "line_items": [
       {
-        "id": "item_123",
+        "item": {
+          "id": "item_123"
+        },
         "quantity": 1
       }
     ],
@@ -22,9 +25,12 @@
     }
   },
   "create_checkout_session_request_with_first_touch_attribution": {
-    "items": [
+    "currency": "usd",
+    "line_items": [
       {
-        "id": "item_123",
+        "item": {
+          "id": "item_123"
+        },
         "quantity": 1
       }
     ],
@@ -37,6 +43,10 @@
   },
   "create_checkout_session_response": {
     "id": "checkout_session_123",
+    "acp": {
+      "version": "2026-01-22",
+      "capabilities": ["pickup_fulfillment", "multi_currency"]
+    },
     "payment_provider": {
       "provider": "stripe",
       "supported_payment_methods": [
@@ -52,9 +62,9 @@
       {
         "id": "line_item_123",
         "item": {
-          "id": "item_123",
-          "quantity": 1
+          "id": "item_123"
         },
+        "quantity": 1,
         "base_amount": 300,
         "discount": 0,
         "subtotal": 300,
@@ -359,9 +369,9 @@
       {
         "id": "line_item_123",
         "item": {
-          "id": "item_123",
-          "quantity": 1
+          "id": "item_123"
         },
+        "quantity": 1,
         "base_amount": 300,
         "discount": 0,
         "subtotal": 300,
@@ -881,5 +891,195 @@
     "code": "requires_3ds",
     "message": "This checkout session requires issuer authentication. The request must include 'authentication_result' as provided by the issuer authentication flow.",
     "param": "$.authentication_result"
+  },
+  "create_with_pickup_fulfillment": {
+    "currency": "usd",
+    "line_items": [
+      {
+        "item": { "id": "item_shoes_001" },
+        "quantity": 1
+      }
+    ],
+    "fulfillment_details": {
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "phone_number": "15551234567"
+    }
+  },
+  "response_with_pickup_options": {
+    "id": "sess_pickup_001",
+    "acp": {
+      "version": "2026-01-22",
+      "capabilities": ["pickup_fulfillment", "local_delivery"]
+    },
+    "status": "ready_for_payment",
+    "currency": "usd",
+    "line_items": [
+      {
+        "id": "line_item_001",
+        "item": { "id": "item_shoes_001" },
+        "quantity": 1,
+        "total": 8000
+      }
+    ],
+    "fulfillment_options": [
+      {
+        "type": "pickup",
+        "id": "pickup_sf_001",
+        "title": "In-Store Pickup - SF",
+        "subtitle": "Ready in 2 hours",
+        "location": {
+          "name": "San Francisco Store",
+          "address": {
+            "line_one": "123 Market St",
+            "city": "San Francisco",
+            "state": "CA",
+            "country": "US",
+            "postal_code": "94102"
+          }
+        },
+        "pickup_type": "in_store",
+        "ready_by": "2026-01-22T16:00:00Z",
+        "total": 0
+      },
+      {
+        "type": "local_delivery",
+        "id": "local_del_001",
+        "title": "Same-Day Delivery",
+        "subtitle": "Delivers by 8pm today",
+        "delivery_window": {
+          "start": "2026-01-22T17:00:00Z",
+          "end": "2026-01-22T20:00:00Z"
+        },
+        "total": 999
+      }
+    ],
+    "totals": [
+      { "type": "subtotal", "display_text": "Subtotal", "amount": 8000 },
+      { "type": "total", "display_text": "Total", "amount": 8000 }
+    ]
+  },
+  "create_with_subscription": {
+    "currency": "usd",
+    "line_items": [
+      {
+        "item": { "id": "item_coffee_sub" },
+        "quantity": 1,
+        "subscription": {
+          "is_subscription": true,
+          "interval": "month",
+          "interval_count": 1
+        }
+      }
+    ]
+  },
+  "response_with_multi_currency": {
+    "id": "sess_intl_001",
+    "acp": {
+      "version": "2026-01-22",
+      "capabilities": ["multi_currency", "international_shipping"]
+    },
+    "status": "ready_for_payment",
+    "currency": "usd",
+    "presentment_currency": "eur",
+    "exchange_rate": 0.92,
+    "exchange_rate_timestamp": "2026-01-22T10:00:00Z",
+    "locale": "fr-FR",
+    "line_items": [
+      {
+        "id": "line_item_001",
+        "item": { "id": "item_001" },
+        "quantity": 2,
+        "total": 10000
+      }
+    ],
+    "totals": [
+      {
+        "type": "total",
+        "display_text": "Total",
+        "amount": 10000,
+        "presentment_amount": 9200
+      }
+    ]
+  },
+  "response_with_warnings": {
+    "id": "sess_warn_001",
+    "acp": {
+      "version": "2026-01-22",
+      "capabilities": []
+    },
+    "status": "ready_for_payment",
+    "currency": "usd",
+    "line_items": [
+      {
+        "id": "line_item_001",
+        "item": { "id": "item_001" },
+        "quantity": 3,
+        "total": 15000,
+        "available_quantity": 5
+      }
+    ],
+    "messages": [
+      {
+        "type": "warning",
+        "code": "low_stock",
+        "severity": "medium",
+        "content": "Only 5 items remaining in stock"
+      }
+    ],
+    "totals": [
+      { "type": "total", "display_text": "Total", "amount": 15000 }
+    ]
+  },
+  "complete_with_risk_signals": {
+    "buyer": {
+      "email": "buyer@example.com",
+      "full_name": "John Doe"
+    },
+    "payment_data": {
+      "token": "pm_token_001",
+      "provider": "stripe"
+    },
+    "risk_signals": {
+      "ip_address": "203.0.113.42",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      "accept_language": "en-US,en;q=0.9",
+      "session_id": "sess_browser_abc123"
+    }
+  },
+  "response_with_b2b_features": {
+    "id": "sess_b2b_001",
+    "acp": {
+      "version": "2026-01-22",
+      "capabilities": ["b2b_purchase_orders", "tax_exemption"]
+    },
+    "status": "pending_approval",
+    "currency": "usd",
+    "buyer": {
+      "email": "procurement@example.com",
+      "full_name": "John Smith",
+      "account_type": "business",
+      "company": {
+        "name": "Acme Corporation",
+        "tax_id": "12-3456789"
+      }
+    },
+    "line_items": [
+      {
+        "id": "line_item_001",
+        "item": { "id": "item_laptop" },
+        "quantity": 10,
+        "total": 1500000,
+        "tax_exempt": true
+      }
+    ],
+    "approval_details": {
+      "approver_email": "manager@example.com",
+      "approval_threshold": 1000000
+    },
+    "totals": [
+      { "type": "subtotal", "display_text": "Subtotal", "amount": 1500000 },
+      { "type": "total", "display_text": "Total", "amount": 1500000 }
+    ]
   }
 }

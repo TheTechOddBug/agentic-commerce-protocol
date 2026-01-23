@@ -1,5 +1,345 @@
 # Unreleased Changes
 
+## Version 2026-01-22 - Enhanced Checkout Capabilities (SEP)
+
+This release introduces significant enhancements to the Agentic Checkout Specification through [SEP: Enhanced Checkout Capabilities](../rfcs/sep.enhanced_checkout.md). These changes enable broader commerce scenarios while maintaining backward compatibility where possible.
+
+### Breaking Changes
+
+#### 1. Renamed `items` to `line_items` in Create/Update Requests
+
+**Impact:** `CheckoutSessionCreateRequest` and `CheckoutSessionUpdateRequest`
+
+**Change:**
+- Old: `items` array
+- New: `line_items` array
+
+**Migration:**
+```json
+// OLD
+{
+  "items": [{ "id": "item_123", "quantity": 1 }]
+}
+
+// NEW
+{
+  "line_items": [
+    {
+      "item": { "id": "item_123" },
+      "quantity": 1
+    }
+  ]
+}
+```
+
+**Rationale:** Aligns request/response terminology and clarifies that items are line-level entries in the cart.
+
+#### 2. Added Required `currency` Field to Create Request
+
+**Impact:** `CheckoutSessionCreateRequest`
+
+**Change:**
+- `currency` field is now **required** in create requests
+
+**Migration:**
+```json
+// OLD
+{
+  "items": [...]
+}
+
+// NEW
+{
+  "currency": "usd",
+  "line_items": [...]
+}
+```
+
+**Rationale:** Explicit currency declaration is essential for multi-currency support and removes ambiguity.
+
+#### 3. Moved `quantity` from Item to LineItem
+
+**Impact:** `Item` and `LineItem` schemas
+
+**Change:**
+- Old: `Item` schema contained `quantity` field
+- New: `LineItem` schema contains `quantity` field; `Item` is now just a reference
+
+**Migration:**
+```json
+// OLD Response
+{
+  "line_items": [{
+    "item": { "id": "item_123", "quantity": 2 }
+  }]
+}
+
+// NEW Response
+{
+  "line_items": [{
+    "item": { "id": "item_123" },
+    "quantity": 2
+  }]
+}
+```
+
+**Rationale:** Enables hierarchical product relationships and cleaner separation between item definitions and cart line entries.
+
+#### 4. Changed Buyer Name Fields
+
+**Impact:** `Buyer` schema
+
+**Change:**
+- `first_name` and `last_name` are now **optional**
+- Added optional `full_name` field as an alternative
+- `email` is now **required**
+
+**Migration:**
+```json
+// OLD (first_name required)
+{
+  "buyer": {
+    "first_name": "John",
+    "last_name": "Doe"
+  }
+}
+
+// NEW (flexible name handling)
+{
+  "buyer": {
+    "email": "john@example.com",      // Required
+    "full_name": "John Doe"            // OR first_name + last_name
+  }
+}
+```
+
+**Rationale:** Supports international naming conventions and reduces required fields.
+
+### New Features
+
+#### 1. Protocol Versioning & Capability Discovery
+
+Added `acp` object to all checkout session responses:
+
+```json
+{
+  "acp": {
+    "version": "2026-01-22",
+    "capabilities": [
+      "pickup_fulfillment",
+      "multi_currency",
+      "subscription_billing"
+    ]
+  }
+}
+```
+
+**Note:** Future versions will introduce structured capability objects for detailed agent/seller capability negotiation.
+
+#### 2. New Fulfillment Types
+
+Added support for:
+- **Pickup** (`FulfillmentOptionPickup`): In-store, curbside, locker pickup
+- **Local Delivery** (`FulfillmentOptionLocalDelivery`): Same-day, scheduled delivery
+
+```json
+{
+  "type": "pickup",
+  "pickup_type": "in_store",
+  "location": { ... },
+  "ready_by": "2026-01-22T16:00:00Z"
+}
+```
+
+#### 3. Enhanced Messaging System
+
+- Added **warning** message type with severity levels
+- Expanded error codes
+- Added `severity` field: `info`, `low`, `medium`, `high`, `critical`
+
+```json
+{
+  "messages": [{
+    "type": "warning",
+    "code": "low_stock",
+    "severity": "medium",
+    "content": "Only 5 items remaining"
+  }]
+}
+```
+
+#### 4. Risk Signals for Fraud Prevention
+
+Added `risk_signals` to `CheckoutSessionCompleteRequest`:
+
+```json
+{
+  "risk_signals": {
+    "ip_address": "203.0.113.42",
+    "user_agent": "Mozilla/5.0...",
+    "device_fingerprint": "fp_abc123"
+  }
+}
+```
+
+#### 5. Hierarchical Product Structure
+
+Added `parent_id` to `LineItem` for bundled/related products:
+
+```json
+{
+  "line_items": [
+    { "id": "line_001", "item": {...}, "quantity": 1 },
+    { "id": "line_002", "item": {...}, "quantity": 2, "parent_id": "line_001" }
+  ]
+}
+```
+
+#### 6. Multi-Currency Support
+
+Added presentment currency for display purposes:
+
+```json
+{
+  "currency": "usd",
+  "presentment_currency": "eur",
+  "exchange_rate": 0.92,
+  "totals": [{
+    "amount": 10000,              // USD cents
+    "presentment_amount": 9200     // EUR cents
+  }]
+}
+```
+
+#### 7. Session Management Enhancements
+
+- Added `expires_at` for session expiration
+- Added `continue_url` for recovery
+- Added `created_at` and `updated_at` timestamps
+- New status values: `incomplete`, `requires_escalation`, `complete_in_progress`
+
+#### 8. Subscription & Recurring Billing
+
+Added subscription metadata to line items:
+
+```json
+{
+  "subscription": {
+    "is_subscription": true,
+    "interval": "month",
+    "interval_count": 1,
+    "trial_period_days": 14
+  }
+}
+```
+
+#### 9. B2B Commerce Features
+
+- Purchase order support in `PaymentData`
+- Tax exemption tracking
+- Approval workflows with `ApprovalDetails`
+- Business buyer metadata in `Buyer.company`
+
+#### 10. Promotional Campaigns
+
+- `applied_coupons` array with redemption details
+- `automatic_discounts` for rule-based promotions
+- `available_promotions` to suggest offers
+
+#### 11. Enhanced Product Metadata
+
+Added to line items:
+- `product_id`, `sku`, `variant_id`
+- `available_quantity`, `availability_status`
+- `weight`, `dimensions`
+- `requires_shipping`, `is_taxable`, `tax_code`
+
+#### 12. Gift Services & Special Instructions
+
+- `gift_options` with messages and wrapping
+- `order_notes` for buyer comments
+- `special_instructions` with structured handling notes
+
+#### 13. Expanded Link Types
+
+Added link types: `shipping_policy`, `contact_us`, `about_us`, `faq`, `support`
+
+Added optional `title` field to links.
+
+#### 14. Order Confirmation Details
+
+Added `order` object in complete responses with:
+- `order_number`
+- `confirmation_number`
+- `receipt_url`
+- `estimated_delivery`
+
+#### 15. Payment Response Object
+
+Added `payment` object to responses:
+
+```json
+{
+  "payment": {
+    "provider": "stripe",
+    "instruments": [...],
+    "handlers": [...]
+  }
+}
+```
+
+### Schema Changes
+
+**Files Updated:**
+- `spec/openapi/openapi.agentic_checkout.yaml`
+- `spec/json-schema/schema.agentic_checkout.json`
+- `examples/examples.agentic_checkout.json`
+
+**New Schemas Added:**
+- `ProtocolVersion`
+- `PaymentResponse`
+- `RiskSignals`
+- `FulfillmentOptionPickup`
+- `FulfillmentOptionLocalDelivery`
+- `MessageWarning`
+- `AppliedCoupon`
+- `AutomaticDiscount`
+- `SubscriptionDetails`
+- `ApprovalDetails`
+- `GiftOptions`
+- `SpecialInstructions`
+
+**Modified Schemas:**
+- `CheckoutSessionBase` - Added many new optional fields
+- `LineItem` - Added `quantity`, `parent_id`, extensive metadata
+- `Item` - Removed `quantity`
+- `Buyer` - Flexible name handling, company details
+- `Message` - Added severity levels
+- `Link` - Added title and new types
+- `FulfillmentOption` - Added descriptions
+
+### Version Compatibility
+
+- Clients MUST send `API-Version: 2026-01-22` header
+- Previous version `2026-01-16` is deprecated
+- Breaking changes require client updates for:
+  - Request field names (`items` → `line_items`)
+  - Required `currency` field
+  - Item/LineItem quantity location
+  - Buyer name fields
+
+### Migration Guide
+
+1. Update request construction to use `line_items` instead of `items`
+2. Include `currency` in all create requests
+3. Move `quantity` from Item to LineItem level in response handling
+4. Update Buyer handling for flexible name fields
+5. Optionally adopt new features (protocol versioning, new fulfillment types, etc.)
+
+See [SEP: Enhanced Checkout Capabilities](../rfcs/sep.enhanced_checkout.md) for complete details.
+
+---
+
 ## Version 2026-01-16
 
 ### Capability Negotiation
@@ -11,6 +351,42 @@ See [RFC: Capability Negotiation](../rfcs/rfc.capability_negotiation.md) for ful
 ### Supported Card Networks
 
 Added `supported_card_networks` field to advertise which card networks a merchant accepts.
+
+---
+
+## Version 2026-01-15
+
+### Modified shape of `supported_payment_methods`
+
+**Modified shape of `supported_payment_methods` within `payment_provider` to allow merchants to specify supported cart networks.**
+
+**Impact:** schema of `supported_payment_methods` field, and introduction of `PaymentMethod` object.
+
+**Change:**
+- Old: `supported_payment_methods` was an error of enums which specified the supported payment types.
+- New: `supported_payment_methods` is an array of `PaymentMethod`, which allows specification of supported card networks.
+
+**Migration:**
+```json
+// OLD
+{
+  "provider": "stripe",
+  "supported_payment_methods": ["card"]
+}
+
+// NEW
+{
+  "provider": "stripe",
+  "supported_payment_methods": [
+    {
+      "type": "card",
+      "supported_card_networks": ["amex", "discover", "mastercard", "visa"]
+    }
+  ]
+}
+```
+
+**Rationale:** Merchants will want to specify the card network they are willing to accept for certain types of transactions.
 
 ---
 
@@ -204,46 +580,12 @@ Added support for the **Affiliate Attribution** extension, enabling agents to cr
 
 See [RFC: Affiliate Attribution](../rfcs/rfc.affiliate_attribution.md) for full specification details.
 
-## Version 2026-01-15
-
-### Modified shape of `supported_payment_methods`
-
-**Modified shape of `supported_payment_methods` within `payment_provider` to allow merchants to specify supported cart networks.**
-
-**Impact:** schema of `supported_payment_methods` field, and introduction of `PaymentMethod` object.
-
-**Change:**
-- Old: `supported_payment_methods` was an error of enums which specified the supported payment types.
-- New: `supported_payment_methods` is an array of `PaymentMethod`, which allows specification of supported card networks.
-
-**Migration:**
-```json
-// OLD
-{
-  "provider": "stripe",
-  "supported_payment_methods": ["card"]
-}
-
-// NEW
-{
-  "provider": "stripe",
-  "supported_payment_methods": [
-    {
-      "type": "card",
-      "supported_card_networks": ["amex", "discover", "mastercard", "visa"]
-    }
-  ]
-}
-```
-
-**Rationale:** Merchants will want to specify the card network they are willing to accept for certain types of transactions.
-
 ---
 
 ## Version Compatibility
 
-- Clients MUST send `API-Version: 2026-01-16` header
-- Previous version `2026-01-15` is deprecated
+- Clients MUST send `API-Version: 2026-01-22` header
+- Previous version `2026-01-16` is deprecated
 - All changes are breaking and require client updates
 
 ## Files Updated

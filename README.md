@@ -134,6 +134,16 @@ To start building with ACP:
 | Project Principles    | [docs/principles-mission.md](docs/principles-mission.md)                                                               |
 | SEP Guidelines        | [docs/sep-guidelines.md](docs/sep-guidelines.md)                                                                       |
 
+### Specifications (RFCs)
+
+| Specification                       | Status | Description                                              |
+| ----------------------------------- | ------ | -------------------------------------------------------- |
+| [Agentic Checkout](rfcs/rfc.agentic_checkout.md) | Active | Core checkout session API for creating and managing purchases |
+| [Enhanced Checkout Capabilities](rfcs/sep.enhanced_checkout.md) | Draft | Extended features for advanced commerce scenarios |
+| [Delegate Payment](rfcs/rfc.delegate_payment.md) | Active | Payment token delegation between agents and merchants |
+| [Affiliate Attribution](rfcs/rfc.affiliate_attribution.md) | Active | Attribution tracking for affiliate networks |
+| [Intent Traces](rfcs/rfc.intent_traces.md) | Active | Buyer intent tracking for conversion optimization |
+
 ---
 
 ## 📝 Contributing

@@ -445,23 +445,61 @@ components:
         email: { type: string, format: email }
         address: { $ref: "#/components/schemas/Address" }
 
+    CompanyInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        tax_id: { type: string }
+        department: { type: string }
+        cost_center: { type: string }
+      required: [name]
+
+    LoyaltyInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        tier: { type: string }
+        points_balance: { type: integer }
+        member_since: { type: string, format: date-time }
+
+    TaxExemption:
+      type: object
+      additionalProperties: false
+      properties:
+        certificate_id: { type: string }
+        certificate_type:
+          { type: string, enum: [resale, exempt_organization, government] }
+        exempt_regions:
+          type: array
+          items: { type: string }
+        expires_at: { type: string, format: date-time }
+      required: [certificate_id, certificate_type]
+
     Buyer:
       type: object
       additionalProperties: false
       properties:
         first_name: { type: string }
         last_name: { type: string }
+        full_name: { type: string }
         email: { type: string, format: email }
         phone_number: { type: string }
-      required: [first_name, last_name, email]
+        customer_id: { type: string }
+        account_type: { type: string, enum: [guest, registered, business] }
+        authentication_status:
+          { type: string, enum: [authenticated, guest, requires_signin] }
+        company: { $ref: "#/components/schemas/CompanyInfo" }
+        loyalty: { $ref: "#/components/schemas/LoyaltyInfo" }
+        tax_exemption: { $ref: "#/components/schemas/TaxExemption" }
+      required: [email]
 
     Item:
       type: object
       additionalProperties: false
       properties:
         id: { type: string }
-        quantity: { type: integer, minimum: 1 }
-      required: [id, quantity]
+      required: [id]
 
     Disclosure:
       type: object
@@ -499,7 +537,7 @@ components:
           items:
             type: string
             enum: [amex, discover, mastercard, visa]
-      required: [type, supported_card_networks]
+      required: [type]
 
     PaymentProvider:
       type: object
@@ -514,12 +552,61 @@ components:
             $ref: "#/components/schemas/PaymentMethod"
       required: [provider, supported_payment_methods]
 
+    VariantOption:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        value: { type: string }
+      required: [name, value]
+
+    WeightInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        value: { type: number }
+        unit: { type: string, enum: [g, kg, oz, lb] }
+      required: [value, unit]
+
+    DimensionsInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        length: { type: number }
+        width: { type: number }
+        height: { type: number }
+        unit: { type: string, enum: [cm, in] }
+      required: [length, width, height, unit]
+
+    SubscriptionInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        is_subscription: { type: boolean }
+        interval: { type: string, enum: [daily, weekly, monthly, yearly] }
+        interval_count: { type: integer, minimum: 1 }
+        trial_period_days: { type: integer, minimum: 0 }
+        billing_cycles: { type: integer, nullable: true }
+      required: [is_subscription]
+
+    DiscountDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        code: { type: string }
+        type: { type: string, enum: [percentage, fixed, bogo, volume] }
+        amount: { type: integer }
+        description: { type: string }
+        source: { type: string, enum: [coupon, automatic, loyalty] }
+      required: [type, amount]
+
     LineItem:
       type: object
       additionalProperties: false
       properties:
         id: { type: string }
         item: { $ref: "#/components/schemas/Item" }
+        quantity: { type: integer, minimum: 1 }
         base_amount: { type: integer }
         discount: { type: integer }
         subtotal: { type: integer }
@@ -539,7 +626,47 @@ components:
           items: { $ref: "#/components/schemas/CustomAttribute" }
         marketplace_seller_details:
           { $ref: "#/components/schemas/MarketplaceSellerDetails" }
-      required: [id, item, base_amount, discount, subtotal, tax, total]
+        product_id: { type: string }
+        sku: { type: string }
+        variant_id: { type: string }
+        category: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        weight: { $ref: "#/components/schemas/WeightInfo" }
+        dimensions: { $ref: "#/components/schemas/DimensionsInfo" }
+        availability_status:
+          {
+            type: string,
+            enum: [in_stock, low_stock, out_of_stock, backorder, pre_order],
+          }
+        available_quantity: { type: integer, minimum: 0 }
+        max_quantity_per_order: { type: integer, minimum: 1 }
+        fulfillable_on: { type: string, format: date-time }
+        variant_options:
+          type: array
+          items: { $ref: "#/components/schemas/VariantOption" }
+        subscription: { $ref: "#/components/schemas/SubscriptionInfo" }
+        discount_details:
+          type: array
+          items: { $ref: "#/components/schemas/DiscountDetail" }
+        tax_exempt: { type: boolean }
+        tax_exemption_reason: { type: string }
+        parent_id: { type: string, description: "Reference to parent line item for bundled products" }
+        totals:
+          type: array
+          items: { $ref: "#/components/schemas/Total" }
+          description: "Line-item level totals breakdown"
+      required: [id, item, quantity, total]
+
+    TaxBreakdownItem:
+      type: object
+      additionalProperties: false
+      properties:
+        jurisdiction: { type: string }
+        rate: { type: number }
+        amount: { type: integer }
+      required: [jurisdiction, rate, amount]
 
     Total:
       type: object
@@ -556,12 +683,69 @@ components:
               fulfillment,
               tax,
               fee,
+              gift_wrap,
+              tip,
+              store_credit,
               total,
             ]
         display_text: { type: string }
         amount: { type: integer }
+        presentment_amount: { type: integer }
         description: { type: string }
+        breakdown:
+          type: array
+          items: { $ref: "#/components/schemas/TaxBreakdownItem" }
       required: [type, display_text, amount]
+
+    FulfillmentOptionPickup:
+      type: object
+      additionalProperties: false
+      properties:
+        type: { type: string, const: pickup }
+        id: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+        description: { type: string }
+        location:
+          type: object
+          properties:
+            name: { type: string }
+            address: { $ref: "#/components/schemas/Address" }
+            phone: { type: string }
+            instructions: { type: string }
+          required: [name, address]
+        pickup_type: { type: string, enum: [in_store, curbside, locker] }
+        ready_by: { type: string, format: date-time }
+        pickup_by: { type: string, format: date-time }
+        subtotal: { type: integer }
+        tax: { type: integer }
+        total: { type: integer }
+      required: [type, id, title, location, total]
+
+    FulfillmentOptionLocalDelivery:
+      type: object
+      additionalProperties: false
+      properties:
+        type: { type: string, const: local_delivery }
+        id: { type: string }
+        title: { type: string }
+        subtitle: { type: string }
+        description: { type: string }
+        delivery_window:
+          type: object
+          properties:
+            start: { type: string, format: date-time }
+            end: { type: string, format: date-time }
+          required: [start, end]
+        service_area:
+          type: object
+          properties:
+            radius_miles: { type: number }
+            center_postal_code: { type: string }
+        subtotal: { type: integer }
+        tax: { type: integer }
+        total: { type: integer }
+      required: [type, id, title, total]
 
     FulfillmentOptionShipping:
       type: object
@@ -571,13 +755,14 @@ components:
         id: { type: string }
         title: { type: string }
         subtitle: { type: string }
+        description: { type: string }
         carrier: { type: string }
         earliest_delivery_time: { type: string, format: date-time }
         latest_delivery_time: { type: string, format: date-time }
         subtotal: { type: integer }
         tax: { type: integer }
         total: { type: integer }
-      required: [type, id, title, subtotal, tax, total]
+      required: [type, id, title, total]
 
     FulfillmentOptionDigital:
       type: object
@@ -587,10 +772,31 @@ components:
         id: { type: string }
         title: { type: string }
         subtitle: { type: string }
+        description: { type: string }
         subtotal: { type: integer }
         tax: { type: integer }
         total: { type: integer }
-      required: [type, id, title, subtotal, tax, total]
+      required: [type, id, title, total]
+
+    SelectedPickupFulfillmentOption:
+      type: object
+      additionalProperties: false
+      properties:
+        option_id: { type: string }
+        item_ids:
+          type: array
+          items: { type: string }
+      required: [option_id, item_ids]
+
+    SelectedLocalDeliveryFulfillmentOption:
+      type: object
+      additionalProperties: false
+      properties:
+        option_id: { type: string }
+        item_ids:
+          type: array
+          items: { type: string }
+      required: [option_id, item_ids]
 
     SelectedShippingFulfillmentOption:
       type: object
@@ -616,9 +822,14 @@ components:
       type: object
       additionalProperties: false
       properties:
-        type: { type: string, enum: [shipping, digital] }
+        type: { type: string, enum: [shipping, digital, pickup, local_delivery] }
         shipping: { $ref: "#/components/schemas/SelectedShippingFulfillmentOption" }
         digital: { $ref: "#/components/schemas/SelectedDigitalFulfillmentOption" }
+        pickup: { $ref: "#/components/schemas/SelectedPickupFulfillmentOption" }
+        local_delivery:
+          {
+            $ref: "#/components/schemas/SelectedLocalDeliveryFulfillmentOption",
+          }
       required: [type]
       oneOf:
         - properties:
@@ -627,16 +838,47 @@ components:
         - properties:
             type: { const: digital }
           required: [digital]
+        - properties:
+            type: { const: pickup }
+          required: [pickup]
+        - properties:
+            type: { const: local_delivery }
+          required: [local_delivery]
 
     MessageInfo:
       type: object
       additionalProperties: false
       properties:
         type: { type: string, const: info }
+        severity: { type: string, enum: [info, low, medium, high, critical] }
         param: { type: string, description: "RFC 9535 JSONPath" }
         content_type: { type: string, enum: [plain, markdown] }
         content: { type: string }
       required: [type, content_type, content]
+
+    MessageWarning:
+      type: object
+      additionalProperties: false
+      properties:
+        type: { type: string, const: warning }
+        code:
+          {
+            type: string,
+            enum:
+              [
+                low_stock,
+                high_demand,
+                shipping_delay,
+                price_change,
+                expiring_promotion,
+                limited_availability,
+              ],
+          }
+        severity: { type: string, enum: [info, low, medium, high, critical] }
+        param: { type: string, description: "RFC 9535 JSONPath" }
+        content_type: { type: string, enum: [plain, markdown] }
+        content: { type: string }
+      required: [type, code, content_type, content]
 
     MessageError:
       type: object
@@ -654,13 +896,88 @@ components:
                 payment_declined,
                 requires_sign_in,
                 requires_3ds,
+                low_stock,
+                quantity_exceeded,
+                coupon_invalid,
+                coupon_expired,
+                minimum_not_met,
+                maximum_exceeded,
+                region_restricted,
+                age_verification_required,
+                approval_required,
+                unsupported,
+                not_found,
+                conflict,
+                rate_limited,
+                expired,
               ],
           }
+        severity: { type: string, enum: [info, low, medium, high, critical] }
         param:
           { type: string, description: "RFC 9535 JSONPath", nullable: true }
         content_type: { type: string, enum: [plain, markdown] }
         content: { type: string }
       required: [type, code, content_type, content]
+
+    AppliedCoupon:
+      type: object
+      additionalProperties: false
+      properties:
+        code: { type: string }
+        status:
+          {
+            type: string,
+            enum: [applied, invalid, expired, limit_reached],
+          }
+        discount_amount: { type: integer }
+        description: { type: string }
+        error: { type: string, nullable: true }
+      required: [code, status]
+
+    AutomaticDiscount:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        discount_amount: { type: integer }
+        description: { type: string }
+      required: [id, name, discount_amount]
+
+    AvailablePromotion:
+      type: object
+      additionalProperties: false
+      properties:
+        code: { type: string }
+        description: { type: string }
+        requirements: { type: string }
+      required: [code, description]
+
+    GiftWrap:
+      type: object
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        style: { type: string, enum: [birthday, holiday, elegant] }
+        charge: { type: integer }
+      required: [enabled]
+
+    GiftOptions:
+      type: object
+      additionalProperties: false
+      properties:
+        is_gift: { type: boolean }
+        gift_message: { type: string, maxLength: 500 }
+        gift_wrap: { $ref: "#/components/schemas/GiftWrap" }
+        hide_prices: { type: boolean }
+      required: [is_gift]
+
+    SpecialInstructions:
+      type: object
+      additionalProperties: false
+      properties:
+        delivery: { type: string }
+        personalization: { type: string }
 
     Link:
       type: object
@@ -669,10 +986,28 @@ components:
         type:
           {
             type: string,
-            enum: [terms_of_use, privacy_policy, return_policy],
+            enum:
+              [
+                terms_of_use,
+                privacy_policy,
+                return_policy,
+                shipping_policy,
+                contact_us,
+                about_us,
+                faq,
+                support,
+              ],
           }
+        title: { type: string }
         url: { type: string, format: uri }
       required: [type, url]
+
+    SplitPayment:
+      type: object
+      additionalProperties: false
+      properties:
+        amount: { type: integer }
+      required: [amount]
 
     PaymentData:
       type: object
@@ -681,7 +1016,81 @@ components:
         token: { type: string }
         provider: { type: string, enum: [stripe] }
         billing_address: { $ref: "#/components/schemas/Address" }
-      required: [token, provider]
+        purchase_order_number: { type: string }
+        payment_terms:
+          { type: string, enum: [immediate, net_15, net_30, net_60, net_90] }
+        due_date: { type: string, format: date-time }
+        approval_required: { type: boolean }
+      anyOf:
+        - required: [token, provider]
+        - required: [purchase_order_number]
+
+    SubscriptionDetails:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [trial, active, paused, canceled] }
+        current_period_start: { type: string, format: date-time }
+        current_period_end: { type: string, format: date-time }
+        trial_end: { type: string, format: date-time }
+        cancel_at_period_end: { type: boolean }
+        next_billing_date: { type: string, format: date-time }
+      required: [id, status]
+
+    FulfillmentGroup:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        item_ids:
+          type: array
+          items: { type: string }
+        destination_type:
+          {
+            type: string,
+            enum: [shipping, pickup, local_delivery, digital],
+          }
+        fulfillment_details: { $ref: "#/components/schemas/FulfillmentDetails" }
+        location_id: { type: string }
+        instructions: { type: string }
+      required: [id, item_ids, destination_type]
+
+    ApprovalDetails:
+      type: object
+      additionalProperties: false
+      properties:
+        approver_email: { type: string, format: email }
+        approval_threshold: { type: integer }
+        requested_at: { type: string, format: date-time }
+        approval_url: { type: string, format: uri }
+      required: [approver_email]
+
+    EstimatedDelivery:
+      type: object
+      additionalProperties: false
+      properties:
+        earliest: { type: string, format: date-time }
+        latest: { type: string, format: date-time }
+      required: [earliest, latest]
+
+    OrderConfirmation:
+      type: object
+      additionalProperties: false
+      properties:
+        confirmation_number: { type: string }
+        confirmation_email_sent: { type: boolean }
+        receipt_url: { type: string, format: uri }
+        invoice_number: { type: string }
+
+    SupportInfo:
+      type: object
+      additionalProperties: false
+      properties:
+        email: { type: string, format: email }
+        phone: { type: string }
+        hours: { type: string }
+        help_center_url: { type: string, format: uri }
 
     Order:
       type: object
@@ -689,30 +1098,74 @@ components:
       properties:
         id: { type: string }
         checkout_session_id: { type: string }
+        order_number: { type: string }
         permalink_url: { type: string, format: uri }
+        status: { type: string, enum: [confirmed, processing, shipped, delivered] }
+        estimated_delivery: { $ref: "#/components/schemas/EstimatedDelivery" }
+        confirmation: { $ref: "#/components/schemas/OrderConfirmation" }
+        support: { $ref: "#/components/schemas/SupportInfo" }
       required: [id, checkout_session_id, permalink_url]
+
+    ProtocolVersion:
+      type: object
+      additionalProperties: false
+      properties:
+        version: { type: string, example: "2026-01-22" }
+        capabilities:
+          type: array
+          items: { type: string }
+          description: "List of supported capabilities"
+      required: [version]
+
+    PaymentResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        provider: { type: string }
+        instruments:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        handlers:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
 
     CheckoutSessionBase:
       type: object
       additionalProperties: false
       properties:
         id: { type: string }
+        acp: { $ref: "#/components/schemas/ProtocolVersion" }
         buyer: { $ref: "#/components/schemas/Buyer" }
         payment_provider: { $ref: "#/components/schemas/PaymentProvider" }
+        payment: { $ref: "#/components/schemas/PaymentResponse" }
         status:
           {
             type: string,
             enum:
               [
+                incomplete,
                 not_ready_for_payment,
+                requires_escalation,
                 authentication_required,
                 ready_for_payment,
+                pending_approval,
+                complete_in_progress,
                 completed,
                 canceled,
                 in_progress,
+                expired,
               ],
           }
         currency: { type: string }
+        presentment_currency: { type: string }
+        exchange_rate: { type: number }
+        exchange_rate_timestamp: { type: string, format: date-time }
+        locale: { type: string }
+        timezone: { type: string }
         line_items:
           type: array
           items: { $ref: "#/components/schemas/LineItem" }
@@ -723,9 +1176,14 @@ components:
             oneOf:
               - $ref: "#/components/schemas/FulfillmentOptionShipping"
               - $ref: "#/components/schemas/FulfillmentOptionDigital"
+              - $ref: "#/components/schemas/FulfillmentOptionPickup"
+              - $ref: "#/components/schemas/FulfillmentOptionLocalDelivery"
         selected_fulfillment_options:
           type: array
           items: { $ref: "#/components/schemas/SelectedFulfillmentOption" }
+        fulfillment_groups:
+          type: array
+          items: { $ref: "#/components/schemas/FulfillmentGroup" }
         totals:
           type: array
           items: { $ref: "#/components/schemas/Total" }
@@ -734,12 +1192,36 @@ components:
           items:
             oneOf:
               - $ref: "#/components/schemas/MessageInfo"
+              - $ref: "#/components/schemas/MessageWarning"
               - $ref: "#/components/schemas/MessageError"
         links:
           type: array
           items: { $ref: "#/components/schemas/Link" }
         authentication_metadata:
           $ref: "#/components/schemas/AuthenticationMetadata"
+        applied_coupons:
+          type: array
+          items: { $ref: "#/components/schemas/AppliedCoupon" }
+        automatic_discounts:
+          type: array
+          items: { $ref: "#/components/schemas/AutomaticDiscount" }
+        available_promotions:
+          type: array
+          items: { $ref: "#/components/schemas/AvailablePromotion" }
+        gift_options: { $ref: "#/components/schemas/GiftOptions" }
+        order_notes: { type: string }
+        special_instructions: { $ref: "#/components/schemas/SpecialInstructions" }
+        subscription_details: { $ref: "#/components/schemas/SubscriptionDetails" }
+        approval_details: { $ref: "#/components/schemas/ApprovalDetails" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        continue_url: { type: string, format: uri }
+        metadata:
+          type: object
+          additionalProperties: true
+        quote_id: { type: string }
+        quote_expires_at: { type: string, format: date-time }
       required:
         [
           id,
@@ -769,27 +1251,62 @@ components:
       additionalProperties: false
       properties:
         buyer: { $ref: "#/components/schemas/Buyer" }
-        items:
+        line_items:
           type: array
           items: { $ref: "#/components/schemas/Item" }
           minItems: 1
+        currency: { type: string, description: "ISO 4217 currency code" }
         fulfillment_details: { $ref: "#/components/schemas/FulfillmentDetails" }
+        fulfillment_groups:
+          type: array
+          items: { $ref: "#/components/schemas/FulfillmentGroup" }
         affiliate_attribution:
           { $ref: "#/components/schemas/AffiliateAttribution" }
-      required: [items]
+        coupons:
+          type: array
+          items: { type: string }
+        gift_options: { $ref: "#/components/schemas/GiftOptions" }
+        order_notes: { type: string }
+        special_instructions: { $ref: "#/components/schemas/SpecialInstructions" }
+        locale: { type: string }
+        timezone: { type: string }
+        quote_id: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [line_items, currency]
 
     CheckoutSessionUpdateRequest:
       type: object
       additionalProperties: false
       properties:
         buyer: { $ref: "#/components/schemas/Buyer" }
-        items:
+        line_items:
           type: array
           items: { $ref: "#/components/schemas/Item" }
         fulfillment_details: { $ref: "#/components/schemas/FulfillmentDetails" }
+        fulfillment_groups:
+          type: array
+          items: { $ref: "#/components/schemas/FulfillmentGroup" }
         selected_fulfillment_options:
           type: array
           items: { $ref: "#/components/schemas/SelectedFulfillmentOption" }
+        coupons:
+          type: array
+          items: { type: string }
+        gift_options: { $ref: "#/components/schemas/GiftOptions" }
+        order_notes: { type: string }
+        special_instructions: { $ref: "#/components/schemas/SpecialInstructions" }
+
+    RiskSignals:
+      type: object
+      additionalProperties: false
+      properties:
+        ip_address: { type: string }
+        user_agent: { type: string }
+        accept_language: { type: string }
+        session_id: { type: string }
+        device_fingerprint: { type: string }
 
     CheckoutSessionCompleteRequest:
       type: object
@@ -801,6 +1318,7 @@ components:
           { $ref: "#/components/schemas/AuthenticationResult" }
         affiliate_attribution:
           { $ref: "#/components/schemas/AffiliateAttribution" }
+        risk_signals: { $ref: "#/components/schemas/RiskSignals" }
       required: [payment_data]
 
     AuthenticationMetadata:
